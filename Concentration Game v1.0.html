@@ -81,10 +81,26 @@
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      const modes = { easy: 4, challenging: 6, expert: 8 };
+
+      const modes = { 
+        superEasy: 3, // New super easy mode
+        easy: 4,
+        challenging: 6,
+        expert: 8 
+      };
+      
+      // Update the dropdown to include the new mode
       const modeSelect = document.getElementById('modeSelect');
       const currentMode = localStorage.getItem('concentrationMode') || 'easy';
+      modeSelect.innerHTML = `
+        <option value="superEasy">Super Easy (3×3)</option>
+        <option value="easy">Easy (4×4)</option>
+        <option value="challenging">Challenging (6×6)</option>
+        <option value="expert">Expert (8×8)</option>
+      `;
       modeSelect.value = currentMode;
+      
+      // Ensure the rest of the logic dynamically adjusts for the new grid size
 
       const muteBtn = document.getElementById('muteBtn');
       let isMuted = false;
