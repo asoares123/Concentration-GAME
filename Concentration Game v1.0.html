@@ -82,23 +82,28 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
 
-      const modes = { 
-        superEasy: 3, // New super easy mode
+       const modes = { 
+        superEasy: 4, // New super easy mode (4 columns)
         easy: 4,
         challenging: 6,
         expert: 8 
       };
       
-      // Update the dropdown to include the new mode
+      // Set "superEasy" as the default mode
       const modeSelect = document.getElementById('modeSelect');
-      const currentMode = localStorage.getItem('concentrationMode') || 'easy';
+      const currentMode = localStorage.getItem('concentrationMode') || 'superEasy'; // Default to superEasy
       modeSelect.innerHTML = `
-        <option value="superEasy">Super Easy (3×3)</option>
+        <option value="superEasy">Super Easy (4×3)</option>
         <option value="easy">Easy (4×4)</option>
         <option value="challenging">Challenging (6×6)</option>
         <option value="expert">Expert (8×8)</option>
       `;
       modeSelect.value = currentMode;
+      
+      // Update the game grid logic
+      const gridSize = modes[currentMode];
+      const totalCards = gridSize * 3; // Adjust rows for Super Easy mode to 3
+      const pairs = totalCards / 2;
       
       // Ensure the rest of the logic dynamically adjusts for the new grid size
 
