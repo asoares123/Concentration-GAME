@@ -136,7 +136,7 @@
         "./wrong3.wav",
         "./dont_think_so2.wav"
       ];
-      const winSoundUrl = "https://www.wavsource.com/snds_2020-10-01_3728627494378403/tv/simpsons/misc/multi_yea.wav";
+      const winSoundUrl = "./man_v_machine.wav";
       let lastCorrectIndex = -1;
       let lastIncorrectIndex = -1;
       let timerInterval;
@@ -151,8 +151,6 @@
         localStorage.removeItem(`leaderboard_${newMode}`);
         location.reload();
       });
-
-      
   
       const deckKey = `concentrationDeck_${currentMode}`;
       const matchKey = `concentrationMatches_${currentMode}`;
