@@ -76,154 +76,251 @@
   </div>
 
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      // Define columns and rows per mode
-      const modes = { superEasy: 4, easy: 4, challenging: 6, expert: 8 };
-      const rowsMap = { superEasy: 3, easy: 4, challenging: 6, expert: 8 };
-      // Timer durations per mode (in seconds)
-      const timeMap = { superEasy: 60, easy: 120, challenging: 240, expert: 300 };
-      
-      // Setup mode selector
-      const modeSelect = document.getElementById('modeSelect');
-      const currentMode = localStorage.getItem('concentrationMode') || 'superEasy';
-      modeSelect.innerHTML = `
-        <option value="superEasy">Super Easy (4×3)</option>
-        <option value="easy">Easy (4×4)</option>
-        <option value="challenging">Challenging (6×6)</option>
-        <option value="expert">Expert (8×8)</option>
-      `;
-      modeSelect.value = currentMode;
-      
-      // Handle mode change
-      modeSelect.addEventListener('change', () => {
+  (function() {
+    // Define columns and rows per mode
+    const modes   = { superEasy: 4,        easy: 4,      challenging: 6,    expert: 8 };
+    const rowsMap = { superEasy: 3,        easy: 4,      challenging: 6,    expert: 8 };
+    const timeMap = { superEasy: 60,       easy: 120,    challenging: 240,  expert: 300 };
+    
+    // Setup mode selector
+    const modeSelect   = document.getElementById('modeSelect');
+    const currentMode  = localStorage.getItem('concentrationMode') || 'superEasy';
+    modeSelect.innerHTML = `
+      <option value="superEasy">Super Easy (4×3)</option>
+      <option value="easy">Easy (4×4)</option>
+      <option value="challenging">Challenging (6×6)</option>
+      <option value="expert">Expert (8×8)</option>
+    `;
+    modeSelect.value = currentMode;
+
+    // Handle mode changes
+    modeSelect.addEventListener('change', () => {
+      clearInterval(timerInterval);
+      const newMode = modeSelect.value;
+      localStorage.setItem('concentrationMode', newMode);
+      ['deck','matches','leaderboard'].forEach(k => 
+        localStorage.removeItem(`${k}_${newMode}`));
+      location.reload();
+    });
+
+    // Grid dimensions
+    const cols       = modes[currentMode];
+    const rows       = rowsMap[currentMode];
+    const totalCards = cols * rows;
+    const pairs      = totalCards / 2;
+
+    // Sound URLs
+    const correctSoundUrls   = [
+      "./adorable.wav","./cowabunga.wav","./bart_laughs.wav",
+      "./system_works.wav","./crazy.wav","./krusty_laugh.wav",
+      "./leader_love5.wav","./learned_a_lot.wav","./rowdy.wav"
+    ];
+    const incorrectSoundUrls = [
+      "./absolutely_not.wav","./aw_crap.wav","./cant_be_happening.wav",
+      "./doh_reverb.wav","./dont_think_so.wav","./dont_think_so2.wav",
+      "./no_way.wav","./wrong3.wav"
+    ];
+    const winSoundUrl       = "man_v_machine.wav";
+    let isMuted            = false;
+    let lastCorrectIndex   = -1;
+    let lastIncorrectIndex = -1;
+    const leaderboardKey   = `leaderboard_${currentMode}`;
+    let timerInterval;
+
+    // Mute button
+    const muteBtn = document.getElementById('muteBtn');
+    muteBtn.addEventListener('click', () => {
+      isMuted = !isMuted;
+      muteBtn.textContent = isMuted ? 'Unmute' : 'Mute';
+    });
+
+    // LocalStorage keys
+    const deckKey  = `deck_${currentMode}`;
+    const matchKey = `matches_${currentMode}`;
+
+    // Initialize or load deck & matches
+    function getColors(n) {
+      return Array.from({ length: n }, (_, i) =>
+        `hsl(${Math.round(i * 360 / n)}, 70%, 70%)`
+      );
+    }
+
+    let deck = JSON.parse(localStorage.getItem(deckKey)  || 'null');
+    let matches = JSON.parse(localStorage.getItem(matchKey) || 'null');
+
+    if (!deck || deck.length !== totalCards) {
+      const base = getColors(pairs);
+      deck = [...base, ...base];
+      shuffle(deck);
+      localStorage.setItem(deckKey, JSON.stringify(deck));
+    }
+    if (!Array.isArray(matches)) {
+      matches = [];
+      localStorage.setItem(matchKey, JSON.stringify(matches));
+    }
+
+    // Score
+    let score = matches.length / 2;
+    document.getElementById('score').textContent = `Score: ${score}`;
+
+    // Timer
+    let timeLeft = timeMap[currentMode];
+    const timerDiv = document.getElementById('timer');
+    timerDiv.textContent = `Time Left: ${fmt(timeLeft)}`;
+    timerInterval = setInterval(() => {
+      timeLeft--;
+      if (timeLeft >= 0) timerDiv.textContent = `Time Left: ${fmt(timeLeft)}`;
+      if (timeLeft <= 0) {
         clearInterval(timerInterval);
-        const newMode = modeSelect.value;
-        localStorage.setItem('concentrationMode', newMode);
-        ['Deck','Matches','leaderboard'].forEach(k => localStorage.removeItem(`${k.toLowerCase()}_${newMode}`));
-        location.reload();
-      });
-
-      // Compute grid size
-      const cols = modes[currentMode];
-      const rows = rowsMap[currentMode];
-      const totalCards = cols * rows;
-      const pairs = totalCards / 2;
-
-      // Sound data
-      const correctSoundUrls = [
-        "./adorable.wav",
-        "./cowabunga.wav",
-        "./bart_laughs.wav",
-        "./system_works.wav",
-        "./crazy.wav",
-        "./krusty_laugh.wav",
-        "./leader_love5.wav",
-        "./learned_a_lot.wav",
-        "./rowdy.wav"
-      ];
-      const incorrectSoundUrls = [
-        "./absolutely_not.wav",
-        "./aw_crap.wav",
-        "./cant_be_happening.wav",
-        "./doh_reverb.wav",
-        "./dont_think_so.wav",
-        "./dont_think_so2.wav",
-        "./no_way.wav",
-        "./wrong3.wav"
-      ];
-      const winSoundUrl = "man_v_machine.wav";
-      let isMuted = false, lastCorrectIndex = -1, lastIncorrectIndex = -1;
-      const leaderboardKey = `leaderboard_${currentMode}`;
-
-      // Mute button
-      const muteBtn = document.getElementById('muteBtn');
-      muteBtn.addEventListener('click', () => {
-        isMuted = !isMuted;
-        muteBtn.textContent = isMuted ? 'Unmute' : 'Mute';
-      });
-
-      // LocalStorage keys
-      const deckKey = `concentrationDeck_${currentMode}`;
-      const matchKey = `concentrationMatches_${currentMode}`;
-
-      // Load or init deck/matches
-      function getColors(n) { return Array.from({ length: n }, (_, i) => `hsl(${Math.round(i*360/n)},70%,70%)`); }
-      let deck = JSON.parse(localStorage.getItem(deckKey) || 'null');
-      let matches = JSON.parse(localStorage.getItem(matchKey) || 'null');
-      if (!deck || deck.length !== totalCards) {
-        const base = getColors(pairs);
-        deck = [...base, ...base]; shuffle(deck);
-        localStorage.setItem(deckKey, JSON.stringify(deck));
+        document.querySelectorAll('.card')
+                .forEach(c => c.style.pointerEvents = 'none');
+        document.getElementById('message').textContent = "Time's up! Game Over!";
       }
-      if (!Array.isArray(matches)) { matches = []; localStorage.setItem(matchKey, JSON.stringify(matches)); }
+    }, 1000);
 
-      // Score
-      let score = matches.length/2;
-      document.getElementById('score').textContent = `Score: ${score}`;
-
-      // Timer setup
-      let timeLeft = timeMap[currentMode];
-      function fmt(s){const m=String(Math.floor(s/60)).padStart(2,'0'), sec=String(s%60).padStart(2,'0');return `${m}:${sec}`}      
-      const timerDiv = document.getElementById('timer');
-      timerDiv.textContent = `Time Left: ${fmt(timeLeft)}`;
-      timerInterval = setInterval(()=>{
-        timeLeft--;
-        if(timeLeft>=0) timerDiv.textContent = `Time Left: ${fmt(timeLeft)}`;
-        if(timeLeft<=0){
-          clearInterval(timerInterval);
-          document.querySelectorAll('.card').forEach(c => c.style.pointerEvents='none');
-          document.getElementById('message').textContent="Time's up! Game Over!";
-        }
-      },1000);
-
-      // Reset game
-      document.getElementById('resetBtn').addEventListener('click', ()=>{
+    // Reset game
+    document.getElementById('resetBtn')
+      .addEventListener('click', () => {
         clearInterval(timerInterval);
         localStorage.removeItem(deckKey);
         localStorage.removeItem(matchKey);
-        localStorage.setItem('concentrationMode',currentMode);
+        localStorage.setItem('concentrationMode', currentMode);
         location.reload();
       });
 
-      // Render grid
-      const game = document.getElementById('game');
-      game.style.gridTemplateColumns = `repeat(${cols},80px)`;
-      game.style.gridTemplateRows    = `repeat(${rows},80px)`;
-      let first=null, second=null, lock=false;
-      deck.forEach((col,i)=>{
-        const card=document.createElement('div'); card.className='card';
-        card.dataset.col=col; card.dataset.idx=i;
-        if(matches.includes(i)) { card.style.backgroundColor=col; card.classList.add('matched'); }
-        else card.addEventListener('click',flip);
-        game.appendChild(card);
-      });
+    // Render grid
+    const game = document.getElementById('game');
+    game.style.gridTemplateColumns = `repeat(${cols},80px)`;
+    game.style.gridTemplateRows    = `repeat(${rows},80px)`;
+    let first = null, second = null, lock = false;
 
-      function flip(){ if(lock||this===first||timeLeft<=0) return; this.style.backgroundColor=this.dataset.col; if(!first){first=this;return;} second=this; chk(); }
-      function chk(){ if(first.dataset.col===second.dataset.col) match() else mismatch(); }
-      function match(){
-        const i1=+first.dataset.idx, i2=+second.dataset.idx;
-        matches.push(i1,i2); localStorage.setItem(matchKey,JSON.stringify(matches));
-        [first,second].forEach(c=>c.classList.add('matched'));
-        score++; document.getElementById('score').textContent=`Score: ${score}`;
-        [first,second]=[null,null]; lock=false;
-        if(matches.length===deck.length){
-          clearInterval(timerInterval);
-          document.getElementById('message').textContent='You WON! Congratulations!';
-          if(!isMuted) new Audio(winSoundUrl).play();
-          recordTime(); renderLeaderboard();
-        } else { show('Match!'); if(!isMuted) playCorrect(); }
+    deck.forEach((col, i) => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.col = col;
+      card.dataset.idx = i;
+      if (matches.includes(i)) {
+        card.style.backgroundColor = col;
+        card.classList.add('matched');
+      } else {
+        card.addEventListener('click', flip);
       }
-      function mismatch(){ lock=true; if(!isMuted) playIncorrect(); show('No match.'); setTimeout(()=>{ [first,second].forEach(c=>c.style.backgroundColor='#ccc'); [first,second]=[null,null]; lock=false; },1000); }
-      function playCorrect(){ let idx; do{idx=Math.floor(Math.random()*correctSoundUrls.length);}while(idx===lastCorrectIndex); lastCorrectIndex=idx; new Audio(correctSoundUrls[idx]).play(); }
-      function playIncorrect(){ let idx; do{idx=Math.floor(Math.random()*incorrectSoundUrls.length);}while(idx===lastIncorrectIndex); lastIncorrectIndex=idx; new Audio(incorrectSoundUrls[idx]).play(); }
-      function show(txt){ const m=document.getElementById('message'); m.textContent=txt; setTimeout(()=>m.textContent='',1000); }
-      function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } }
-
-      // Leaderboard
-      function recordTime(){ const elapsed=timeMap[currentMode]-timeLeft; let lb=JSON.parse(localStorage.getItem(leaderboardKey)||'[]'); lb.push(elapsed); lb.sort((a,b)=>a-b); lb.splice(10); localStorage.setItem(leaderboardKey,JSON.stringify(lb)); }
-      function renderLeaderboard(){ const list=document.getElementById('leaderboardList'); list.innerHTML=''; const lb=JSON.parse(localStorage.getItem(leaderboardKey)||'[]'); if(lb.length===0){ const li=document.createElement('li'); li.textContent='None yet.'; list.appendChild(li);} else lb.forEach(t=>{ const li=document.createElement('li'); li.textContent=fmt(t); list.appendChild(li); }); }
-      renderLeaderboard();
+      game.appendChild(card);
     });
+
+    function flip() {
+      if (lock || this === first || timeLeft <= 0) return;
+      this.style.backgroundColor = this.dataset.col;
+      if (!first) {
+        first = this;
+        return;
+      }
+      second = this;
+      checkMatch();
+    }
+
+    function checkMatch() {
+      if (first.dataset.col === second.dataset.col) handleMatch();
+      else handleMismatch();
+    }
+
+    function handleMatch() {
+      const i1 = +first.dataset.idx, i2 = +second.dataset.idx;
+      matches.push(i1, i2);
+      localStorage.setItem(matchKey, JSON.stringify(matches));
+      [first, second].forEach(c => c.classList.add('matched'));
+      score++;
+      document.getElementById('score').textContent = `Score: ${score}`;
+      [first, second] = [null, null];
+      lock = false;
+      if (matches.length === deck.length) {
+        clearInterval(timerInterval);
+        document.getElementById('message').textContent = 'You WON! Congratulations!';
+        if (!isMuted) new Audio(winSoundUrl).play();
+        recordTime();
+        renderLeaderboard();
+      } else {
+        showMessage('Match!');
+        if (!isMuted) playCorrect();
+      }
+    }
+
+    function handleMismatch() {
+      lock = true;
+      if (!isMuted) playIncorrect();
+      showMessage('No match.');
+      setTimeout(() => {
+        [first,second].forEach(c => c.style.backgroundColor = '#ccc');
+        [first, second] = [null, null];
+        lock = false;
+      }, 1000);
+    }
+
+    function playCorrect(){
+      let idx;
+      do { idx = Math.floor(Math.random()*correctSoundUrls.length); }
+      while (idx === lastCorrectIndex);
+      lastCorrectIndex = idx;
+      new Audio(correctSoundUrls[idx]).play();
+    }
+
+    function playIncorrect(){
+      let idx;
+      do { idx = Math.floor(Math.random()*incorrectSoundUrls.length); }
+      while (idx === lastIncorrectIndex);
+      lastIncorrectIndex = idx;
+      new Audio(incorrectSoundUrls[idx]).play();
+    }
+
+    function showMessage(text){
+      const msg = document.getElementById('message');
+      msg.textContent = text;
+      setTimeout(() => msg.textContent = '', 1000);
+    }
+
+    function recordTime(){
+      const elapsed = timeMap[currentMode] - timeLeft;
+      let lb = JSON.parse(localStorage.getItem(leaderboardKey) || '[]');
+      lb.push(elapsed);
+      lb.sort((a,b)=>a-b);
+      lb.splice(10);
+      localStorage.setItem(leaderboardKey, JSON.stringify(lb));
+    }
+
+    function renderLeaderboard(){
+      const list = document.getElementById('leaderboardList');
+      list.innerHTML = '';
+      const lb = JSON.parse(localStorage.getItem(leaderboardKey) || '[]');
+      if (lb.length === 0) {
+        const li = document.createElement('li');
+        li.textContent = 'None yet.';
+        list.appendChild(li);
+      } else {
+        lb.forEach(t => {
+          const li = document.createElement('li');
+          li.textContent = fmt(t);
+          list.appendChild(li);
+        });
+      }
+    }
+
+    function fmt(s){
+      const m = String(Math.floor(s/60)).padStart(2,'0'),
+            sec = String(s%60).padStart(2,'0');
+      return `${m}:${sec}`;
+    }
+
+    function shuffle(a){
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random()*(i+1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+    }
+
+    // Initial leaderboard render
+    renderLeaderboard();
+
+  })();
   </script>
 </body>
 </html>
