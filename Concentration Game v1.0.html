@@ -204,9 +204,13 @@
       }
       function playCorrect(){ let idx; do{idx=Math.floor(Math.random()*correctSoundUrls.length);}while(idx===lastCorrectIndex);
         lastCorrectIndex=idx; new Audio(correctSoundUrls[idx]).play(); }
-      function selectIncorrect() {
-        lastIncorrectIndex = (lastIncorrectIndex + 1) % incorrectSoundUrls.length;
-        new Audio(incorrectSoundUrls[lastIncorrectIndex]).play();
+        function selectIncorrect() {
+            let idx;
+            do {
+                idx = Math.floor(Math.random() * incorrectSoundUrls.length);
+              } while (idx === lastIncorrectIndex); // Ensure it's not the same as the last index
+            lastIncorrectIndex = idx; // Update the lastIncorrectIndex
+            new Audio(incorrectSoundUrls[idx]).play(); // Play the selected sound
       }
 
       function recordTime(){
