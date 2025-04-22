@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concentration Game</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    #controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    #game {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .card {
+      width: 80px;
+      height: 80px;
+      background-color: #ccc;
+      border: 2px solid #999;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.3s;
+    }
+    .matched {
+      pointer-events: none;
+      opacity: 0.6;
+    }
+    #message {
+      margin-top: 20px;
+      height: 24px;
+      font-weight: bold;
+    }
+    #score, #timer {
+      font-size: 16px;
+      margin: 5px;
+    }
+    #leaderboard {
+      margin-top: 20px;
+      text-align: center;
+    }
+    #leaderboard ol {
+      padding-left: 20px;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <h1>Concentration Game</h1>
+  <div id="controls">
+    <label for="modeSelect">Mode:</label>
+    <select id="modeSelect">
+      <option value="easy">Easy (4×4)</option>
+      <option value="challenging">Challenging (6×6)</option>
+      <option value="expert">Expert (8×8)</option>
+    </select>
+    <button id="muteBtn">Mute</button>
+    <button id="resetBtn">New Game</button>
+  </div>
+  <div id="score">Score: 0</div>
+  <div id="timer">Time Left: 02:00</div>
+  <div id="game"></div>
+  <div id="message"></div>
+  <div id="leaderboard">
+    <h2>Top 10 Best Times</h2>
+    <ol id="leaderboardList"></ol>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const modes = { easy: 4, challenging: 6, expert: 8 };
+      const modeSelect = document.getElementById('modeSelect');
+      const currentMode = localStorage.getItem('concentrationMode') || 'easy';
+      modeSelect.value = currentMode;
+
+      const muteBtn = document.getElementById('muteBtn');
+      let isMuted = false;
+      muteBtn.addEventListener('click', () => {
+        isMuted = !isMuted;
+        muteBtn.textContent = isMuted ? 'Unmute' : 'Mute';
+      });
+
+      const correctSoundUrls = [
+        "https://www.wavsource.com/snds_2020-10-01_3728627494378403/tv/simpsons/bart/cowabunga.wav",
+        "https://www.wavsource.com/snds_2020-10-01_3728627494378403/tv/simpsons/bart/bart_laughs.wav",
+        "https://www.wavsource.com/snds_2020-10-01_3728627494378403/tv/simpsons/bart/system_works.wav"
+      ];
+      const incorrectSoundUrls = [
+        "https://www.wavsource.com/snds_2020-10-01_3728627494378403/tv/simpsons/bart/big_deal.wav",
+        "https://www.wavsource.com/snds_2020-10-01_3728627494378403/tv/simpsons/bart/eat_my_shorts.wav",
+        "https://www.wavsource.com/snds_2020-10-01_3728627494378403/tv/simpsons/misc/multi_groan1.wav"
+      ];
+      const winSoundUrl = "https://www.wavsource.com/snds_2020-10-01_3728627494378403/tv/simpsons/misc/multi_yea.wav";
+      let lastCorrectIndex = -1;
+      let lastIncorrectIndex = -1;
+      let timerInterval;
+      const leaderboardKey = `leaderboard_${currentMode}`;
+
+      modeSelect.addEventListener('change', () => {
+        clearInterval(timerInterval);
+        const newMode = modeSelect.value;
+        localStorage.setItem('concentrationMode', newMode);
+        localStorage.removeItem(`concentrationDeck_${newMode}`);
+        localStorage.removeItem(`concentrationMatches_${newMode}`);
+        localStorage.removeItem(`leaderboard_${newMode}`);
+        location.reload();
+      });
+
+      const gridSize = modes[currentMode];
+      const totalCards = gridSize * gridSize;
+      const pairs = totalCards / 2;
+      const deckKey = `concentrationDeck_${currentMode}`;
+      const matchKey = `concentrationMatches_${currentMode}`;
+
+      function getColors(n) {
+        return Array.from({ length: n }, (_, i) =>
+          `hsl(${Math.round((i * 360) / n)},70%,70%)`
+        );
+      }
+
+      let deck = JSON.parse(localStorage.getItem(deckKey) || 'null');
+      let matches = JSON.parse(localStorage.getItem(matchKey) || 'null');
+
+      if (!deck || deck.length !== totalCards) {
+        const base = getColors(pairs);
+        deck = [...base, ...base]; shuffle(deck);
+        localStorage.setItem(deckKey, JSON.stringify(deck));
+      }
+      if (!matches) { matches = []; localStorage.setItem(matchKey, JSON.stringify(matches)); }
+
+      let score = matches.length / 2;
+      document.getElementById('score').textContent = `Score: ${score}`;
+
+      let timeLeft = 120;
+      function fmt(sec) { const m = String(Math.floor(sec/60)).padStart(2,'0'); const s = String(sec%60).padStart(2,'0'); return `${m}:${s}`; }
+      const timerDiv = document.getElementById('timer');
+      timerDiv.textContent = `Time Left: ${fmt(timeLeft)}`;
+      timerInterval = setInterval(() => {
+        timeLeft--; if (timeLeft >= 0) timerDiv.textContent = `Time Left: ${fmt(timeLeft)}`;
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          document.querySelectorAll('.card').forEach(c => c.style.pointerEvents = 'none');
+          document.getElementById('message').textContent = "Time's up! Game Over!";
+        }
+      }, 1000);
+
+      document.getElementById('resetBtn').addEventListener('click', () => {
+        clearInterval(timerInterval);
+        localStorage.removeItem(deckKey);
+        localStorage.removeItem(matchKey);
+        localStorage.setItem('concentrationMode', currentMode);
+        location.reload();
+      });
+
+      const game = document.getElementById('game');
+      game.style.gridTemplateColumns = `repeat(${gridSize},80px)`;
+      let first = null, second = null, lock = false;
+
+      deck.forEach((col,i) => {
+        const card = document.createElement('div'); card.className = 'card';
+        card.dataset.col = col; card.dataset.i = i;
+        if(matches.includes(i)) { card.style.backgroundColor = col; card.classList.add('matched'); }
+        else card.addEventListener('click', flipCard);
+        game.appendChild(card);
+      });
+
+      function flipCard() {
+        if(lock||this===first||timeLeft<=0) return;
+        this.style.backgroundColor=this.dataset.col;
+        if(!first){first=this;return;} second=this; checkMatch();
+      }
+      function checkMatch(){ if(first.dataset.col===second.dataset.col) handleMatch(); else handleMismatch(); }
+
+      function handleMatch(){
+        const i1=+first.dataset.i, i2=+second.dataset.i;
+        matches.push(i1,i2); localStorage.setItem(matchKey, JSON.stringify(matches));
+        [first,second].forEach(c=>c.classList.add('matched'));
+        score++; document.getElementById('score').textContent=`Score: ${score}`;
+        [first,second]=[null,null]; lock=false;
+        if(matches.length===deck.length){
+          clearInterval(timerInterval);
+          document.getElementById('message').textContent='You WON! Congratulations!';
+          if(!isMuted) new Audio(winSoundUrl).play();
+          recordTime(); renderLeaderboard();
+        } else { showMessage('Match!'); if(!isMuted) playCorrect(); }
+      }
+      function handleMismatch(){
+        lock=true; if(!isMuted) selectIncorrect(); showMessage('No match.');
+        setTimeout(()=>{ [first,second].forEach(c=>c.style.backgroundColor='#ccc'); [first,second]=[null,null]; lock=false; },1000);
+      }
+      function playCorrect(){ let idx; do{idx=Math.floor(Math.random()*correctSoundUrls.length);}while(idx===lastCorrectIndex);
+        lastCorrectIndex=idx; new Audio(correctSoundUrls[idx]).play(); }
+      function selectIncorrect(){ let idx; do{idx=Math.floor(Math.random()*incorrectSoundUrls.length);}while(idx===lastIncorrectIndex);
+        lastIncorrectIndex=idx; new Audio(incorrectSoundUrls[idx]).play(); }
+
+      function recordTime(){
+        const elapsed = 120 - timeLeft;
+        const board = JSON.parse(localStorage.getItem(leaderboardKey) || '[]');
+        board.push(elapsed);
+        board.sort((a,b)=>a-b);
+        board.splice(10);
+        localStorage.setItem(leaderboardKey, JSON.stringify(board));
+      }
+      function renderLeaderboard(){
+        const list = document.getElementById('leaderboardList'); list.innerHTML='';
+        const board = JSON.parse(localStorage.getItem(leaderboardKey) || '[]');
+        board.forEach(time=>{
+          const li=document.createElement('li');
+          li.textContent=fmt(time);
+          list.appendChild(li);
+        });
+      }
+
+      function showMessage(text){ const msg=document.getElementById('message'); msg.textContent=text; setTimeout(()=>msg.textContent='',1000); }
+      function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } }
+
+      // initial leaderboard render
+      renderLeaderboard();
+    });
+  </script>
+</body>
+</html>
