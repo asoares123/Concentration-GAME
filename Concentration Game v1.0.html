@@ -221,15 +221,22 @@
         board.splice(10);
         localStorage.setItem(leaderboardKey, JSON.stringify(board));
       }
-      function renderLeaderboard(){
-        const list = document.getElementById('leaderboardList'); list.innerHTML='';
+     function renderLeaderboard() {
+        const list = document.getElementById('leaderboardList');
+        list.innerHTML = '';
         const board = JSON.parse(localStorage.getItem(leaderboardKey) || '[]');
-        board.forEach(time=>{
-          const li=document.createElement('li');
-          li.textContent=fmt(time);
+        if (board.length === 0) {
+          const li = document.createElement('li');
+          li.textContent = 'None available so far.';
           list.appendChild(li);
-        });
+        } else {
+          board.forEach(time => {
+            const li = document.createElement('li');
+            li.textContent = fmt(time);
+            list.appendChild(li);
+          });
       }
+}
 
       function showMessage(text){ const msg=document.getElementById('message'); msg.textContent=text; setTimeout(()=>msg.textContent='',1000); }
       function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } }
